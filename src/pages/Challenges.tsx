@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, Trophy, Zap, ShieldCheck, Star, Info, Loader2, CheckCircle2, Circle, Sparkles } from 'lucide-react';
-import { getChallenges, toggleChallenge, generateChallenges, type Challenge } from '../services/challengeService';
+import { getChallenges, toggleChallenge, generateChallenges } from '../services/challengeService';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 
@@ -11,7 +11,7 @@ export default function Challenges() {
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
-  const { data: challenges, isLoading, error } = useQuery({
+  const { data: challenges, isLoading } = useQuery({
     queryKey: ['challenges', selectedMonth, selectedYear],
     queryFn: () => getChallenges(selectedMonth, selectedYear),
   });

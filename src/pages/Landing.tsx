@@ -7,7 +7,6 @@ import {
   Shield, 
   ArrowRight, 
   BarChart3, 
-  Wallet, 
   Layers,
   Zap,
   Target
