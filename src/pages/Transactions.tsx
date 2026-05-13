@@ -74,18 +74,30 @@ export default function Transactions() {
     mutationFn: scanReceipt,
     onSuccess: (data) => {
       setIsScanning(false);
-      if (Array.isArray(data)) {
-        setScannedItems(data);
+      
+      // Pastikan kita mendapatkan array items
+      let items = data;
+      
+      // Jika data adalah objek yang punya properti data berupa array, gunakan itu
+      if (data && !Array.isArray(data) && Array.isArray((data as any).data)) {
+        items = (data as any).data;
+      }
+
+      if (Array.isArray(items) && items.length > 0) {
+        setScannedItems(items);
         setReviewOpen(true);
-      } else {
-        // Fallback for single object response (legacy or if AI returns object instead of array)
+        setManualOpen(false);
+      } else if (items) {
+        // Fallback untuk single object atau jika array hanya 1 item tapi ingin tetap pakai form manual
+        const singleItem = Array.isArray(items) ? items[0] : items;
         setFormValues({
-          tanggal: data.tanggal || new Date().toISOString().split('T')[0],
-          kategori: data.kategori || '',
-          jumlah: data.jumlah?.toString() || '',
-          deskripsi: data.deskripsi || '',
+          tanggal: singleItem.tanggal || new Date().toISOString().split('T')[0],
+          kategori: singleItem.kategori || '',
+          jumlah: singleItem.jumlah?.toString() || '',
+          deskripsi: singleItem.deskripsi || '',
         });
         setManualOpen(true);
+        setReviewOpen(false);
       }
     },
     onError: () => {
