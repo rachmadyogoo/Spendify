@@ -72,24 +72,30 @@ export default function Transactions() {
 
   const scanMutation = useMutation({
     mutationFn: scanReceipt,
-    onSuccess: (data) => {
+    onSuccess: (res: any) => {
+      console.log("Scan Data received:", res);
       setIsScanning(false);
       
-      // Pastikan kita mendapatkan array items
-      let items = data;
+      let items: any[] = [];
       
-      // Jika data adalah objek yang punya properti data berupa array, gunakan itu
-      if (data && !Array.isArray(data) && Array.isArray((data as any).data)) {
-        items = (data as any).data;
+      // Deteksi Array secara agresif
+      if (Array.isArray(res)) {
+        items = res;
+      } else if (res && Array.isArray(res.data)) {
+        items = res.data;
+      } else if (res && typeof res === 'object') {
+        const foundArray = Object.values(res).find(v => Array.isArray(v));
+        if (foundArray) items = foundArray as any[];
       }
 
-      if (Array.isArray(items) && items.length > 0) {
+      if (items && items.length > 0) {
+        console.log("Found items array:", items);
         setScannedItems(items);
         setReviewOpen(true);
         setManualOpen(false);
-      } else if (items) {
-        // Fallback untuk single object atau jika array hanya 1 item tapi ingin tetap pakai form manual
-        const singleItem = Array.isArray(items) ? items[0] : items;
+      } else if (res) {
+        console.log("No array found, using fallback for single item:", res);
+        const singleItem = Array.isArray(res) ? res[0] : (res.data && !Array.isArray(res.data) ? res.data : res);
         setFormValues({
           tanggal: singleItem.tanggal || new Date().toISOString().split('T')[0],
           kategori: singleItem.kategori || '',
@@ -450,8 +456,8 @@ export default function Transactions() {
             >
               <div className="p-8 border-b border-border flex items-center justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold">Review Hasil Scan</h3>
-                  <p className="text-sm text-muted-foreground">Kami menemukan {scannedItems.length} item. Silakan periksa dan sesuaikan.</p>
+                  <h3 className="text-md md:text-2xl font-bold">Review Hasil Scan</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground">Kami menemukan {scannedItems.length} item. Silakan periksa dan sesuaikan.</p>
                 </div>
                 <Button 
                   variant="outline" 
