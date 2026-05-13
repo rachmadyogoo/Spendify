@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, FileUp, Trash2, Search, ChevronLeft, ChevronRight, Camera, Sparkles, Loader2 } from 'lucide-react';
-import { getTransactions, addTransaction, uploadTransactionsExcel, deleteTransaction, scanReceipt } from '../services/transactionService';
+import { getTransactions, addTransaction, uploadTransactionsExcel, deleteTransaction, scanReceipt, addBulkTransactions } from '../services/transactionService';
 import { getCategories, type Category } from '../services/categoryService';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -28,6 +28,9 @@ export default function Transactions() {
     jumlah: '',
     deskripsi: '',
   });
+
+  const [scannedItems, setScannedItems] = useState<any[]>([]);
+  const [isReviewOpen, setReviewOpen] = useState(false);
   
   // Fetch Data
   const { data: transactions, isLoading } = useQuery({
@@ -71,17 +74,36 @@ export default function Transactions() {
     mutationFn: scanReceipt,
     onSuccess: (data) => {
       setIsScanning(false);
-      setFormValues({
-        tanggal: data.tanggal || new Date().toISOString().split('T')[0],
-        kategori: data.kategori || '',
-        jumlah: data.jumlah?.toString() || '',
-        deskripsi: data.deskripsi || '',
-      });
-      setManualOpen(true);
+      if (Array.isArray(data)) {
+        setScannedItems(data);
+        setReviewOpen(true);
+      } else {
+        // Fallback for single object response (legacy or if AI returns object instead of array)
+        setFormValues({
+          tanggal: data.tanggal || new Date().toISOString().split('T')[0],
+          kategori: data.kategori || '',
+          jumlah: data.jumlah?.toString() || '',
+          deskripsi: data.deskripsi || '',
+        });
+        setManualOpen(true);
+      }
     },
     onError: () => {
       setIsScanning(false);
       alert('Gagal memproses struk. Silakan coba lagi atau input manual.');
+    }
+  });
+
+  const bulkAddMutation = useMutation({
+    mutationFn: addBulkTransactions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setReviewOpen(false);
+      setScannedItems([]);
+      alert('Semua transaksi berhasil disimpan!');
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Gagal menyimpan transaksi');
     }
   });
 
@@ -396,6 +418,147 @@ export default function Transactions() {
           </div>
         )}
       </div>
+
+      {/* Scan Review Modal */}
+      <AnimatePresence>
+        {isReviewOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setReviewOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl bg-card border border-border rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+            >
+              <div className="p-8 border-b border-border flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold">Review Hasil Scan</h3>
+                  <p className="text-sm text-muted-foreground">Kami menemukan {scannedItems.length} item. Silakan periksa dan sesuaikan.</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setScannedItems([...scannedItems, {
+                    tanggal: new Date().toISOString().split('T')[0],
+                    kategori: '',
+                    jumlah: 0,
+                    deskripsi: 'Item Baru'
+                  }])}
+                >
+                  <Plus className="w-4 h-4 mr-2" /> Tambah Item
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-4">
+                {scannedItems.map((item, index) => (
+                  <motion.div 
+                    layout
+                    key={index} 
+                    className="p-6 bg-secondary/20 border border-border rounded-2xl grid grid-cols-1 md:grid-cols-4 gap-4 items-end relative group"
+                  >
+                    <button 
+                      onClick={() => setScannedItems(scannedItems.filter((_, i) => i !== index))}
+                      className="absolute -top-2 -right-2 p-2 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">Tanggal</label>
+                      <Input 
+                        type="date" 
+                        value={item.tanggal}
+                        onChange={(e) => {
+                          const newItems = [...scannedItems];
+                          newItems[index].tanggal = e.target.value;
+                          setScannedItems(newItems);
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">Kategori</label>
+                      <select
+                        value={item.kategori}
+                        onChange={(e) => {
+                          const newItems = [...scannedItems];
+                          newItems[index].kategori = e.target.value;
+                          setScannedItems(newItems);
+                        }}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="" disabled>Kategori</option>
+                        {categories?.map((cat: Category) => (
+                          <option key={cat.id} value={cat.nama}>{cat.nama}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">Deskripsi</label>
+                      <Input 
+                        type="text" 
+                        value={item.deskripsi}
+                        onChange={(e) => {
+                          const newItems = [...scannedItems];
+                          newItems[index].deskripsi = e.target.value;
+                          setScannedItems(newItems);
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">Jumlah (Rp)</label>
+                      <Input 
+                        type="number" 
+                        value={item.jumlah}
+                        onChange={(e) => {
+                          const newItems = [...scannedItems];
+                          newItems[index].jumlah = Number(e.target.value);
+                          setScannedItems(newItems);
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="p-8 border-t border-border flex gap-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => setReviewOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button 
+                  className="flex-2 px-12" 
+                  disabled={bulkAddMutation.isPending || scannedItems.length === 0}
+                  onClick={() => bulkAddMutation.mutate(scannedItems)}
+                >
+                  {bulkAddMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Simpan {scannedItems.length} Transaksi
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Manual Input Modal */}
       <AnimatePresence>
