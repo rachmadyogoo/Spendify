@@ -41,3 +41,8 @@ export const scanReceipt = async (base64Image: string) => {
   const response = await api.post('/transactions/scan', { image: base64Image });
   return response.data.data;
 };
+
+export const addBulkTransactions = async (transactions: { tanggal: string, kategori: string, jumlah: number, deskripsi: string }[]) => {
+  const response = await api.post('/transactions/bulk', { transactions });
+  return response.data;
+};
