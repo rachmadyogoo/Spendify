@@ -218,7 +218,6 @@ export default function Wrapped() {
         <div className="flex flex-col items-center space-y-4 md:space-y-10 px-6 w-full max-w-2xl">
           <div className="text-center space-y-2">
             <h3 className="text-lg md:text-3xl font-black text-blue-400">Strategi Baru</h3>
-            <p className="text-blue-200/50 text-xs md:text-base font-medium">Berdasarkan pola belanjamu bulan ini</p>
           </div>
 
           <motion.div
